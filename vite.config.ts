@@ -11,6 +11,7 @@ export default defineConfig(() => ({
     alias: [
       { find: '@', replacement: path.resolve(root, '.') },
       { find: /^\.\.\/types$/, replacement: path.resolve(root, 'types.ts') },
+      { find: /^\.\.\/services\/storageService$/, replacement: path.resolve(root, 'storageServiceProduction.ts') },
       { find: /^\.\.\/components\/(.+)$/, replacement: path.resolve(root, '$1') },
       { find: /^\.\.\/views\/(.+)$/, replacement: path.resolve(root, '$1') },
       { find: /^\.\.\/data\/(.+)$/, replacement: path.resolve(root, '$1') },
