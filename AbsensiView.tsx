@@ -64,14 +64,14 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({ userRole = 'Guru', cur
     return !q || s.nama.toLowerCase().includes(q) || s.nis.toLowerCase().includes(q);
   }), [kelas, query, isSiswa, ownNis, ownClass]);
 
-  const setStatus = (nis:string, day:number, status:KodeAbsensi|'') => {
+  const setStatus = (rowClass:string, nis:string, day:number, status:KodeAbsensi|'') => {
     if (!canEdit) return;
-    setCells((prev) => ({ ...prev, [keyOf(kelas,year,month,day,nis)]: status }));
+    setCells((prev) => ({ ...prev, [keyOf(rowClass,year,month,day,nis)]: status }));
     setSaved(false);
   };
 
-  const count = (nis:string, status:KodeAbsensi) => Array.from({length:days},(_,i)=>i+1)
-    .filter((d)=>cells[keyOf(kelas,year,month,d,nis)] === status).length;
+  const count = (rowClass:string, nis:string, status:KodeAbsensi) => Array.from({length:days},(_,i)=>i+1)
+    .filter((d)=>cells[keyOf(rowClass,year,month,d,nis)] === status).length;
 
   const simpan = () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(cells));
@@ -101,7 +101,7 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({ userRole = 'Guru', cur
       </div>
 
       <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
-        Data awal yang terisi mengikuti kode eksplisit pada file Excel. Pada sumber yang diberikan, isian rinci tersedia pada Juli–Agustus 2026; bulan September 2026–April 2027 dibiarkan kosong dan tidak diisi otomatis. Sel kosong dipertahankan sebagai sel kosong, bukan dianggap sebagai kode H.
+        Sel harian mengikuti isi eksplisit workbook. Rekap S, I, dan A dihitung dari kode pada sel. Kolom H mengikuti rumus workbook resmi: jumlah hari kalender pada bulan dikurangi S, I, dan A. Karena rumus sumber bekerja demikian, sel harian yang kosong tetap tampak kosong tetapi ikut terhitung pada rekap H.
       </div>
 
       <div className="rounded-2xl border bg-white overflow-hidden">
@@ -114,8 +114,9 @@ export const AbsensiView: React.FC<AbsensiViewProps> = ({ userRole = 'Guru', cur
             <tbody>
               {students.map((s,idx)=>{
                 const rowClass = isSiswa ? s.kelas : kelas;
-                const h = count(s.nis,'H'), sk = count(s.nis,'S'), iz = count(s.nis,'I'), al = count(s.nis,'A');
-                return <tr key={s.nis}><td className="border p-2 text-center">{idx+1}</td><td className="border p-2 text-center font-mono">{s.nis}</td><td className="border p-2 font-semibold">{s.nama}</td>{Array.from({length:days},(_,i)=>{const d=i+1; const k=keyOf(rowClass,year,month,d,s.nis); const v=cells[k]||''; return <td key={d} className="border p-0 text-center">{canEdit ? <select aria-label={`Absensi ${s.nama} tanggal ${d}`} value={v} onChange={(e)=>setStatus(s.nis,d,e.target.value as KodeAbsensi|'')} className="w-full bg-transparent p-1 text-center font-bold"><option value=""></option><option value="H">H</option><option value="S">S</option><option value="I">I</option><option value="A">A</option></select> : <span className="font-bold">{v}</span>}</td>})}<td className="border p-2 text-center font-bold">{sk}</td><td className="border p-2 text-center font-bold">{iz}</td><td className="border p-2 text-center font-bold">{al}</td><td className="border p-2 text-center font-bold">{h}</td></tr>
+                const sk = count(rowClass,s.nis,'S'), iz = count(rowClass,s.nis,'I'), al = count(rowClass,s.nis,'A');
+                const h = Math.max(0, days - sk - iz - al);
+                return <tr key={s.nis}><td className="border p-2 text-center">{idx+1}</td><td className="border p-2 text-center font-mono">{s.nis}</td><td className="border p-2 font-semibold">{s.nama}</td>{Array.from({length:days},(_,i)=>{const d=i+1; const k=keyOf(rowClass,year,month,d,s.nis); const v=cells[k]||''; return <td key={d} className="border p-0 text-center">{canEdit ? <select aria-label={`Absensi ${s.nama} tanggal ${d}`} value={v} onChange={(e)=>setStatus(rowClass,s.nis,d,e.target.value as KodeAbsensi|'')} className="w-full bg-transparent p-1 text-center font-bold"><option value=""></option><option value="H">H</option><option value="S">S</option><option value="I">I</option><option value="A">A</option></select> : <span className="font-bold">{v}</span>}</td>})}<td className="border p-2 text-center font-bold">{sk}</td><td className="border p-2 text-center font-bold">{iz}</td><td className="border p-2 text-center font-bold">{al}</td><td className="border p-2 text-center font-bold">{h}</td></tr>
               })}
             </tbody>
           </table>
