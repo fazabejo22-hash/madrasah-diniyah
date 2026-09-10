@@ -22,6 +22,8 @@ export default defineConfig(() => ({
       { find: /^\.\/SoalUjianView$/, replacement: path.resolve(root, 'SoalUjianViewProduction.tsx') },
       { find: /^\.\/PengumumanView$/, replacement: path.resolve(root, 'PengumumanViewProduction.tsx') },
       { find: /^\.\/HariLiburView$/, replacement: path.resolve(root, 'HariLiburViewProduction.tsx') },
+      { find: /^\.\/PesantrenInfoView$/, replacement: path.resolve(root, 'PesantrenInfoViewProduction.tsx') },
+      { find: /^\.\/PeraturanGuruView$/, replacement: path.resolve(root, 'PeraturanGuruViewProduction.tsx') },
       { find: /^\.\/DashboardAdmin$/, replacement: path.resolve(root, 'DashboardAdminProduction.tsx') },
       { find: /^\.\/DashboardGuru$/, replacement: path.resolve(root, 'DashboardGuruProduction.tsx') },
       { find: /^\.\/DashboardSiswa$/, replacement: path.resolve(root, 'DashboardSiswaProduction.tsx') },
