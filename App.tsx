@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { UserRole, SesiAbsensi, UserProfile, AppUserAccount } from './types';
+import { UserRole, SesiAbsensi, UserProfile, AppUserAccount, NotifikasiItem } from './types';
 import { NavPage, Sidebar } from './Sidebar';
 import { Navbar } from './Navbar';
 import { MobileNav } from './MobileNav';
@@ -20,7 +20,7 @@ import { PesantrenInfoView } from './PesantrenInfoView';
 import { SoalUjianView } from './SoalUjianView';
 import { RaportView } from './RaportView';
 import { IjazahView } from './IjazahView';
-import { SiswaDatabaseView } from './SiswaDatabaseView';
+import { SiswaDatabaseView } from './SiswaDatabaseViewProduction';
 import { MuhafadzohView } from './MuhafadzohView';
 import { NotifikasiView } from './NotifikasiView';
 import { PengumumanView } from './PengumumanView';
@@ -28,9 +28,7 @@ import { PengaturanView } from './PengaturanView';
 import { HariLiburView } from './HariLiburView';
 import { KritikSaranView } from './KritikSaranView';
 import { PeraturanGuruView } from './PeraturanGuruView';
-
-import { MOCK_NOTIFIKASI } from './mockData';
-import { storageService } from './storageService';
+import { storageService } from './storageServiceProduction';
 
 const normalizeRole = (role: UserRole): 'Admin' | 'Guru' | 'Siswa' => {
   const value = String(role).toLowerCase();
@@ -64,7 +62,7 @@ export default function App() {
   const [activeAccount, setActiveAccount] = useState<AppUserAccount | null>(() => getSessionAccount());
   const [userRole, setUserRole] = useState<UserRole>(() => activeAccount ? normalizeRole(activeAccount.role) : 'Guru');
   const [currentPage, setCurrentPage] = useState<NavPage>('dashboard');
-  const [notifications, setNotifications] = useState(MOCK_NOTIFIKASI);
+  const [notifications, setNotifications] = useState<NotifikasiItem[]>([]);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [absensiSession, setAbsensiSession] = useState<SesiAbsensi>(() => storageService.getAbsensiSession());
@@ -88,7 +86,7 @@ export default function App() {
   const normalizedRole = normalizeRole(userRole);
   const currentUser = activeAccount ? accountToProfile(activeAccount) : null;
 
-  const roleNotifications = (notifications || []).filter((n) => {
+  const roleNotifications = notifications.filter((n) => {
     if (normalizedRole === 'Siswa') {
       const isAbsensiWarning = n.judul.toLowerCase().includes('absensi') || n.pesan.toLowerCase().includes('absensi') || n.tautan === 'absensi';
       return !isAbsensiWarning;
