@@ -87,6 +87,7 @@ export interface GuruJadwal {
   nama: string;
   warnaBadge: string;
   keterangan?: string;
+  foto?: string;
 }
 
 export interface JadwalSlotItem {
