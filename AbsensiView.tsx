@@ -1,25 +1,8 @@
-import React, { useState } from 'react';
-import {
-  ClipboardCheck,
-  Search,
-  Filter,
-  Check,
-  AlertTriangle,
-  Printer,
-  Calendar,
-  MapPin,
-  BookOpen,
-  UserCheck,
-  Users,
-  CheckCheck,
-  Download,
-  Info,
-  CalendarOff,
-  BellRing
-} from 'lucide-react';
-import { SesiAbsensi, StatusAbsensi, UserProfile } from '../types';
-import { PdfPreviewModal } from '../components/PdfPreviewModal';
-import { storageService } from '../services/storageService';
+import React, { useMemo, useState } from 'react';
+import { ClipboardCheck, Printer, Save, Search } from 'lucide-react';
+import { SesiAbsensi, UserProfile } from '../types';
+import { DATA_SISWA_247 } from '../data/students247Data';
+import { ABSENSI_EXCEL_SEED, KodeAbsensi } from '../data/attendanceSeed';
 
 interface AbsensiViewProps {
   session?: SesiAbsensi;
@@ -28,492 +11,116 @@ interface AbsensiViewProps {
   currentUser?: UserProfile;
 }
 
-export const AbsensiView: React.FC<AbsensiViewProps> = ({
-  session = storageService.getAbsensiSession(),
-  onSaveSession = (_updatedSession: SesiAbsensi) => {},
-  userRole = 'Guru',
-  currentUser,
-}) => {
+type CellMap = Record<string, KodeAbsensi | ''>;
+const STORAGE_KEY = 'annajiyah_v2_absensi_matrix';
+const kelasList = ['1A','1B','2A','2B','3A','3B','3C','4A','4B','5A','5B','6'];
+const months = [
+  { year: 2026, month: 7, label: 'Juli 2026' },
+  { year: 2026, month: 8, label: 'Agustus 2026' },
+  { year: 2026, month: 9, label: 'September 2026' },
+  { year: 2026, month: 10, label: 'Oktober 2026' },
+  { year: 2026, month: 11, label: 'November 2026' },
+  { year: 2026, month: 12, label: 'Desember 2026' },
+  { year: 2027, month: 1, label: 'Januari 2027' },
+  { year: 2027, month: 2, label: 'Februari 2027' },
+  { year: 2027, month: 3, label: 'Maret 2027' },
+  { year: 2027, month: 4, label: 'April 2027' },
+];
+
+const keyOf = (kelas:string, year:number, month:number, day:number, nis:string) => `${kelas}|${year}|${month}|${day}|${nis}`;
+
+const loadInitial = (): CellMap => {
+  const seeded: CellMap = {};
+  for (const [kelas, year, month, day, nis, status] of ABSENSI_EXCEL_SEED) {
+    seeded[keyOf(kelas, year, month, day, nis)] = status;
+  }
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    return { ...seeded, ...saved };
+  } catch {
+    return seeded;
+  }
+};
+
+export const AbsensiView: React.FC<AbsensiViewProps> = ({ userRole = 'Guru', currentUser }) => {
   const isSiswa = userRole.toLowerCase() === 'siswa';
-  const isGuru = userRole.toLowerCase() === 'guru';
-  const isAdmin = userRole.toLowerCase() === 'admin';
+  const canEdit = !isSiswa;
+  const ownNis = (currentUser?.nipOrNis || '').replace(/\D/g, '');
+  const ownClass = (currentUser?.kelas || '').replace(/^Kelas\s+/i, '');
+  const [kelas, setKelas] = useState(ownClass && kelasList.includes(ownClass) ? ownClass : '1A');
+  const [period, setPeriod] = useState(0);
+  const [query, setQuery] = useState('');
+  const [cells, setCells] = useState<CellMap>(loadInitial);
+  const [saved, setSaved] = useState(false);
 
-  // Check Hari Libur
-  const hariLiburList = storageService.getHariLibur();
-  const activeHoliday = hariLiburList.find((h) => {
-    return (
-      (session.tanggal && (session.tanggal.includes(h.tanggalMulai) || session.tanggal.includes(h.tanggalSelesai))) ||
-      session.tanggal?.toLowerCase().includes('libur')
-    );
-  });
-  const isLibur = Boolean(activeHoliday);
+  const { year, month, label } = months[period];
+  const days = new Date(year, month, 0).getDate();
 
-  const canEdit = !isSiswa && !isLibur;
+  const students = useMemo(() => DATA_SISWA_247.filter((s) => {
+    if (isSiswa && ownNis && s.nis.replace(/\D/g,'') !== ownNis) return false;
+    if (!isSiswa && s.kelas !== kelas) return false;
+    if (isSiswa && !ownNis && ownClass && s.kelas !== ownClass) return false;
+    const q = query.trim().toLowerCase();
+    return !q || s.nama.toLowerCase().includes(q) || s.nis.toLowerCase().includes(q);
+  }), [kelas, query, isSiswa, ownNis, ownClass]);
 
-  // Assigned classes for Guru
-  const assignedClasses = React.useMemo(() => {
-    if (!currentUser?.kelas) return [];
-    return currentUser.kelas.split(',').map((c) => c.trim());
-  }, [currentUser]);
-
-  const [selectedKelas, setSelectedKelas] = useState(() => {
-    if (assignedClasses.length > 0) {
-      const first = assignedClasses[0];
-      return first.startsWith('Kelas ') ? first : `Kelas ${first}`;
-    }
-    return 'Kelas 1A';
-  });
-  const [selectedMapel, setSelectedMapel] = useState(session.mataPelajaran || 'Fiqih (فصلاتن)');
-  const [selectedTanggal, setSelectedTanggal] = useState(
-  isGuru
-    ? new Date().toISOString().split('T')[0]
-    : session.tanggal || new Date().toISOString().split('T')[0]
-);
-  const [selectedRuang, setSelectedRuang] = useState('Teras Kompleks Umar');
-  
-  const [records, setRecords] = useState(session.records || []);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState<string>('Semua');
-  const [saveToast, setSaveToast] = useState(false);
-  const [isCompleted, setIsCompleted] = useState(session.isCompleted);
-  const [showPdfModal, setShowPdfModal] = useState(false);
-
-  // Sync if session prop changes
-  React.useEffect(() => {
-    if (session.records) {
-      setRecords(session.records);
-    }
-    setIsCompleted(session.isCompleted);
-  }, [session]);
-
-  // Handle status toggle for a student (Guru & Admin only)
-  const handleStatusChange = (santriId: string, newStatus: StatusAbsensi) => {
+  const setStatus = (nis:string, day:number, status:KodeAbsensi|'') => {
     if (!canEdit) return;
-    setRecords((prev) =>
-      prev.map((item) =>
-        item.santriId === santriId ? { ...item, status: newStatus } : item
-      )
-    );
+    setCells((prev) => ({ ...prev, [keyOf(kelas,year,month,day,nis)]: status }));
+    setSaved(false);
   };
 
-  // "Hadir Semua" action button (Guru & Admin only)
-  const handleHadirSemua = () => {
-    if (!canEdit) return;
-    setRecords((prev) =>
-      prev.map((item) => ({ ...item, status: 'Hadir' as StatusAbsensi }))
-    );
+  const count = (nis:string, status:KodeAbsensi) => Array.from({length:days},(_,i)=>i+1)
+    .filter((d)=>cells[keyOf(kelas,year,month,d,nis)] === status).length;
+
+  const simpan = () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(cells));
+    setSaved(true);
+    setTimeout(()=>setSaved(false),2500);
   };
-
-  // "Simpan Absensi" action button (Guru & Admin only)
-  const handleSimpanAbsensi = () => {
-    if (!canEdit) return;
-    setIsCompleted(true);
-    const updated: SesiAbsensi = {
-      ...session,
-      kelas: selectedKelas,
-      mataPelajaran: selectedMapel,
-      tanggal: selectedTanggal,
-      jamKe: '', // Time info purged
-      ruang: selectedRuang,
-      isCompleted: true,
-      records: records,
-    };
-    onSaveSession(updated);
-    storageService.saveAbsensiSession(updated);
-    setSaveToast(true);
-    setTimeout(() => setSaveToast(false), 4000);
-  };
-
-  // Filter & Search records
-  const safeRecords = records || [];
-  
-  // If Siswa: ONLY display attendance record for the student matching their name or NIS
-  const visibleRecords = isSiswa
-    ? safeRecords.filter((r) => {
-        const studentNis = (currentUser?.nipOrNis || '').replace(/[^0-9]/g, '');
-        const recordNis = (r.nis || '').replace(/[^0-9]/g, '');
-        const matchNis = studentNis && recordNis && studentNis === recordNis;
-        const matchName =
-          currentUser?.name &&
-          r.nama.toLowerCase().includes(currentUser.name.toLowerCase());
-        return matchNis || matchName || r.santriId === 's-1';
-      })
-    : safeRecords;
-
-  const filteredRecords = visibleRecords.filter((item) => {
-    const matchesSearch =
-      item.nama.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.nis.includes(searchQuery);
-    const matchesStatus =
-      filterStatus === 'Semua' || item.status === filterStatus;
-    return matchesSearch && matchesStatus;
-  });
-
-  // Calculate statistics
-  const total = visibleRecords.length;
-  const hadirCount = visibleRecords.filter((r) => r.status === 'Hadir').length;
-  const izinCount = visibleRecords.filter((r) => r.status === 'Izin').length;
-  const sakitCount = visibleRecords.filter((r) => r.status === 'Sakit').length;
-  const alphaCount = visibleRecords.filter((r) => r.status === 'Alpha').length;
-  const persentaseHadir = total > 0 ? Math.round((hadirCount / total) * 100) : 0;
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div className="space-y-5 pb-12">
+      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            <ClipboardCheck className="w-6 h-6 text-emerald-700" />
-            <span>Presensi & Absensi Santri</span>
-          </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Pencatatan kehadiran santri Madrasah Diniyah Takmiliyah Annajiyah 2 Bahrul Ulum Tambakberas Jombang
-          </p>
+          <h1 className="text-2xl font-black text-slate-900 flex items-center gap-2"><ClipboardCheck className="w-6 h-6 text-emerald-700"/>Absensi Santri</h1>
+          <p className="text-sm text-slate-500 mt-1">Format bulanan mengikuti lembar kelas pada workbook administrasi akademik.</p>
         </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => setShowPdfModal(true)}
-            id="btn-preview-absensi"
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold shadow-2xs transition-colors"
-          >
-            <Printer className="w-4 h-4 text-emerald-700" />
-            <span>Cetak Rekap</span>
-          </button>
-
-          {canEdit && (
-            <>
-              <button
-                onClick={handleHadirSemua}
-                id="btn-hadir-semua"
-                className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold transition-colors"
-              >
-                <CheckCheck className="w-4 h-4" />
-                <span>Hadir Semua</span>
-              </button>
-
-              <button
-                onClick={handleSimpanAbsensi}
-                id="btn-simpan-absensi"
-                className="flex items-center gap-1.5 px-4 py-2 bg-emerald-800 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md transition-all active:scale-95"
-              >
-                <Check className="w-4 h-4" />
-                <span>Simpan Absensi</span>
-              </button>
-            </>
-          )}
+        <div className="flex gap-2">
+          {canEdit && <button onClick={simpan} className="inline-flex items-center gap-2 rounded-xl bg-emerald-800 px-4 py-2 text-sm font-bold text-white"><Save className="w-4 h-4"/>Simpan</button>}
+          <button onClick={()=>window.print()} className="inline-flex items-center gap-2 rounded-xl border bg-white px-4 py-2 text-sm font-bold"><Printer className="w-4 h-4"/>Cetak</button>
         </div>
       </div>
 
-      {/* Siswa Read-Only Banner */}
-      {isSiswa && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-900 flex items-center justify-center shrink-0">
-            <Info className="w-5 h-5 text-emerald-800" />
-          </div>
-          <div className="flex-1">
-            <p className="text-xs sm:text-sm font-bold text-emerald-950">
-              Akses Santri (Hanya Lihat): Menampilkan data absensi kehadiran Anda.
-            </p>
-            <p className="text-xs text-emerald-800/80 mt-0.5">
-              Data absensi hanya dapat diisi dan diubah oleh Ustadz/Guru atau Admin Madrasah.
-            </p>
-          </div>
-        </div>
-      )}
+      {saved && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800">Perubahan absensi berhasil disimpan.</div>}
 
-      {/* Hari Libur Banner (Locks attendance) */}
-      {isLibur && (
-        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-center gap-3.5 text-rose-950">
-          <CalendarOff className="w-6 h-6 text-rose-600 shrink-0" />
-          <div>
-            <h3 className="font-bold text-xs sm:text-sm">
-              Sesi Absensi Diliburkan: {activeHoliday?.keterangan}
-            </h3>
-            <p className="text-[11px] text-rose-800 mt-0.5">
-              Periode: {activeHoliday?.tanggalMulai} s.d. {activeHoliday?.tanggalSelesai}. Pengisian kehadiran dinonaktifkan sesuai Kalender Akademik Pesantren.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Guru Unsubmitted Attendance Reminder */}
-      {isGuru && !isCompleted && !isLibur && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3 text-amber-950">
-          <BellRing className="w-5 h-5 text-amber-600 shrink-0 animate-bounce" />
-          <div>
-            <p className="text-xs font-bold">Pemberitahuan Guru: Sesi Absensi Belum Disimpan</p>
-            <p className="text-[11px] text-amber-800">
-              Silakan periksa status kehadiran seluruh santri di kelas ini dan klik tombol &quot;Simpan Absensi&quot;.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Success Toast */}
-      {saveToast && (
-        <div className="bg-emerald-800 text-white px-4 py-3 rounded-2xl shadow-xl flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-full bg-emerald-600 flex items-center justify-center font-bold text-amber-300">
-              ✓
-            </div>
-            <div>
-              <p className="text-xs sm:text-sm font-bold">Absensi berhasil disimpan.</p>
-              <p className="text-[11px] text-emerald-200">Data telah tercatat ke arsip sistem akademik madrasah.</p>
-            </div>
-          </div>
-          <button
-            onClick={() => setSaveToast(false)}
-            className="text-emerald-200 hover:text-white text-xs font-semibold"
-          >
-            Tutup
-          </button>
-        </div>
-      )}
-
-      {/* Parameter Sesi Pembelajaran (Tanpa Waktu / Jam Pelajaran) */}
-      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-            Parameter Kelas & Pembelajaran
-          </span>
-          <span className="text-[11px] text-emerald-800 font-semibold bg-emerald-50 px-2.5 py-0.5 rounded-full">
-            Guru Pengampu: {session.guruPengampu || 'Ust. Rhendie Reihansyah'}
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {/* 1. Kelas (Hanya nama kelas asli) */}
-          <div>
-            <label className="block text-[11px] font-bold text-slate-600 mb-1">Nama Kelas</label>
-            <select
-              id="select-absensi-kelas"
-              disabled={isSiswa || isLibur}
-              value={selectedKelas}
-              onChange={(e) => setSelectedKelas(e.target.value)}
-              className={`w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 ${
-                isSiswa || isLibur ? 'opacity-80 cursor-not-allowed' : 'focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-600'
-              }`}
-            >
-              {assignedClasses.length > 0 && (
-                <optgroup label="⭐ Kelas yang Anda Ampu">
-                  {assignedClasses.map((cls) => {
-                    const val = cls.startsWith('Kelas ') ? cls : `Kelas ${cls}`;
-                    return (
-                      <option key={val} value={val}>
-                        {val} (Diampu)
-                      </option>
-                    );
-                  })}
-                </optgroup>
-              )}
-              <optgroup label="Daftar Seluruh Kelas">
-                {[
-                  'Kelas 1A',
-                  'Kelas 1B',
-                  'Kelas 2A',
-                  'Kelas 2B',
-                  'Kelas 3A',
-                  'Kelas 3B',
-                  'Kelas 3C',
-                  'Kelas 4A',
-                  'Kelas 4B',
-                  'Kelas 5A',
-                  'Kelas 5B',
-                  'Kelas 6',
-                ].map((cls) => (
-                  <option key={cls} value={cls}>
-                    {cls}
-                  </option>
-                ))}
-              </optgroup>
-            </select>
-          </div>
-
-          {/* 2. Mata Pelajaran / Kitab */}
-          <div>
-            <label className="block text-[11px] font-bold text-slate-600 mb-1">Mata Pelajaran & Kitab</label>
-            <input
-              type="text"
-              readOnly={isSiswa}
-              value={selectedMapel}
-              onChange={(e) => setSelectedMapel(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800"
-            />
-          </div>
-
-          {/* 3. Tanggal */}
-          <div>
-            <label className="block text-[11px] font-bold text-slate-600 mb-1">Tanggal</label>
-            <input
-              type="date"
-              disabled={isSiswa || isGuru}
-              value={selectedTanggal}
-              onChange={(e) => setSelectedTanggal(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800"
-            />
-          </div>
-
-          {/* 4. Ruangan */}
-          <div>
-            <label className="block text-[11px] font-bold text-slate-600 mb-1">Ruangan</label>
-            <input
-              type="text"
-              readOnly={isSiswa}
-              value={selectedRuang}
-              onChange={(e) => setSelectedRuang(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800"
-            />
-          </div>
-        </div>
+      <div className="rounded-2xl border bg-white p-4 grid gap-3 md:grid-cols-3">
+        {!isSiswa && <select value={kelas} onChange={(e)=>setKelas(e.target.value)} className="rounded-xl border px-3 py-2.5 text-sm">{kelasList.map(k=><option key={k} value={k}>Kelas {k}</option>)}</select>}
+        <select value={period} onChange={(e)=>setPeriod(Number(e.target.value))} className="rounded-xl border px-3 py-2.5 text-sm">{months.map((m,i)=><option key={m.label} value={i}>{m.label}</option>)}</select>
+        <div className="relative"><Search className="absolute left-3 top-3 w-4 h-4 text-slate-400"/><input value={query} onChange={(e)=>setQuery(e.target.value)} placeholder="Cari nama / NIS" className="w-full rounded-xl border py-2.5 pl-9 pr-3 text-sm"/></div>
       </div>
 
-      {/* Rekap Kehadiran Stats Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
-          <span className="text-[10px] font-bold text-slate-400 uppercase">Tingkat Hadir</span>
-          <div className="text-xl font-black text-emerald-950 font-mono mt-0.5">{persentaseHadir}%</div>
-          <span className="text-[10px] text-emerald-700 font-semibold">{hadirCount} dari {total} santri</span>
-        </div>
-        <div className="bg-white p-3.5 rounded-2xl border border-emerald-100 shadow-2xs">
-          <span className="text-[10px] font-bold text-emerald-700 uppercase">Hadir</span>
-          <div className="text-xl font-black text-emerald-800 font-mono mt-0.5">{hadirCount}</div>
-          <span className="text-[10px] text-slate-500">Santri di kelas</span>
-        </div>
-        <div className="bg-white p-3.5 rounded-2xl border border-blue-100 shadow-2xs">
-          <span className="text-[10px] font-bold text-blue-700 uppercase">Izin</span>
-          <div className="text-xl font-black text-blue-800 font-mono mt-0.5">{izinCount}</div>
-          <span className="text-[10px] text-slate-500">Surat Izin Resmi</span>
-        </div>
-        <div className="bg-white p-3.5 rounded-2xl border border-amber-100 shadow-2xs">
-          <span className="text-[10px] font-bold text-amber-700 uppercase">Sakit</span>
-          <div className="text-xl font-black text-amber-800 font-mono mt-0.5">{sakitCount}</div>
-          <span className="text-[10px] text-slate-500">Keterangan Sehat</span>
-        </div>
-        <div className="bg-white p-3.5 rounded-2xl border border-rose-100 shadow-2xs">
-          <span className="text-[10px] font-bold text-rose-700 uppercase">Alpha</span>
-          <div className="text-xl font-black text-rose-800 font-mono mt-0.5">{alphaCount}</div>
-          <span className="text-[10px] text-rose-600 font-semibold">Batas maks. 15 hari</span>
-        </div>
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+        Data awal yang terisi mengikuti kode eksplisit pada file Excel. Pada sumber yang diberikan, isian rinci tersedia pada Juli–Agustus 2026; bulan September 2026–April 2027 dibiarkan kosong dan tidak diisi otomatis. Sel kosong dipertahankan sebagai sel kosong, bukan dianggap sebagai kode H.
       </div>
 
-      {/* Search & Filter Status Bar */}
-      <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div className="relative flex-1">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Cari santri berdasarkan nama atau NIS..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-600"
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-slate-400 shrink-0" />
-          <span className="text-xs font-bold text-slate-600">Status:</span>
-          <div className="inline-flex rounded-xl bg-slate-100 p-1">
-            {['Semua', 'Hadir', 'Izin', 'Sakit', 'Alpha'].map((st) => (
-              <button
-                key={st}
-                onClick={() => setFilterStatus(st)}
-                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-colors ${
-                  filterStatus === st
-                    ? 'bg-emerald-800 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                {st}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Table Records Presensi Santri */}
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+      <div className="rounded-2xl border bg-white overflow-hidden">
+        <div className="px-4 py-3 border-b font-black text-slate-800">Kelas {isSiswa ? (ownClass || students[0]?.kelas || '-') : kelas} — {label}</div>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
-                <th className="p-3 w-12 text-center">No</th>
-                <th className="p-3">Nama Santri</th>
-                <th className="p-3 w-28">NIS</th>
-                <th className="p-3 text-center w-32">Status Kehadiran</th>
-                <th className="p-3 text-center">Keterangan Catatan</th>
-              </tr>
+          <table className="min-w-[1500px] w-full border-collapse text-[11px]">
+            <thead className="bg-slate-100">
+              <tr><th className="border p-2">No</th><th className="border p-2">NIS</th><th className="border p-2 text-left min-w-56">Nama</th>{Array.from({length:days},(_,i)=><th key={i} className="border p-1 min-w-10">{i+1}</th>)}<th className="border p-2">S</th><th className="border p-2">I</th><th className="border p-2">A</th><th className="border p-2">H</th></tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredRecords.map((item, idx) => (
-                <tr key={item.santriId} className="hover:bg-slate-50/70 transition-colors">
-                  <td className="p-3 text-center font-mono text-slate-400 font-bold">{idx + 1}</td>
-                  <td className="p-3 font-bold text-slate-900">
-                    <div>{item.nama}</div>
-                    <div className="text-[10px] text-slate-400 font-normal">{selectedKelas}</div>
-                  </td>
-                  <td className="p-3 font-mono text-slate-600 font-semibold">{item.nis}</td>
-                  <td className="p-3 text-center">
-                    {canEdit ? (
-                      <div className="inline-flex rounded-lg bg-slate-100 p-0.5 border border-slate-200">
-                        {(['Hadir', 'Izin', 'Sakit', 'Alpha'] as StatusAbsensi[]).map((st) => {
-                          const isActive = item.status === st;
-                          return (
-                            <button
-                              key={st}
-                              type="button"
-                              onClick={() => handleStatusChange(item.santriId, st)}
-                              className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all ${
-                                isActive
-                                  ? st === 'Hadir'
-                                    ? 'bg-emerald-600 text-white shadow-xs'
-                                    : st === 'Izin'
-                                    ? 'bg-blue-600 text-white shadow-xs'
-                                    : st === 'Sakit'
-                                    ? 'bg-amber-600 text-white shadow-xs'
-                                    : 'bg-rose-600 text-white shadow-xs'
-                                  : 'text-slate-600 hover:text-slate-900'
-                              }`}
-                            >
-                              {st}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <span
-                        className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold ${
-                          item.status === 'Hadir'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : item.status === 'Izin'
-                            ? 'bg-blue-100 text-blue-800'
-                            : item.status === 'Sakit'
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-rose-100 text-rose-800'
-                        }`}
-                      >
-                        {item.status}
-                      </span>
-                    )}
-                  </td>
-                  <td className="p-3 text-center text-slate-500 text-[11px]">
-                    {item.catatan || (item.status === 'Hadir' ? 'Mengikuti KBM tertib' : 'Dispensasi / Tercatat')}
-                  </td>
-                </tr>
-              ))}
+            <tbody>
+              {students.map((s,idx)=>{
+                const rowClass = isSiswa ? s.kelas : kelas;
+                const h = count(s.nis,'H'), sk = count(s.nis,'S'), iz = count(s.nis,'I'), al = count(s.nis,'A');
+                return <tr key={s.nis}><td className="border p-2 text-center">{idx+1}</td><td className="border p-2 text-center font-mono">{s.nis}</td><td className="border p-2 font-semibold">{s.nama}</td>{Array.from({length:days},(_,i)=>{const d=i+1; const k=keyOf(rowClass,year,month,d,s.nis); const v=cells[k]||''; return <td key={d} className="border p-0 text-center">{canEdit ? <select aria-label={`Absensi ${s.nama} tanggal ${d}`} value={v} onChange={(e)=>setStatus(s.nis,d,e.target.value as KodeAbsensi|'')} className="w-full bg-transparent p-1 text-center font-bold"><option value=""></option><option value="H">H</option><option value="S">S</option><option value="I">I</option><option value="A">A</option></select> : <span className="font-bold">{v}</span>}</td>})}<td className="border p-2 text-center font-bold">{sk}</td><td className="border p-2 text-center font-bold">{iz}</td><td className="border p-2 text-center font-bold">{al}</td><td className="border p-2 text-center font-bold">{h}</td></tr>
+              })}
             </tbody>
           </table>
         </div>
       </div>
-
-      {showPdfModal && (
-        <PdfPreviewModal
-          type="absensi"
-          isOpen={showPdfModal}
-          onClose={() => setShowPdfModal(false)}
-        />
-      )}
     </div>
   );
 };
