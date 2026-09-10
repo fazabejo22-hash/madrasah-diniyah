@@ -17,6 +17,7 @@ export default defineConfig(() => ({
       { find: /^\.\/DashboardAdmin$/, replacement: path.resolve(root, 'DashboardAdminProduction.tsx') },
       { find: /^\.\/DashboardGuru$/, replacement: path.resolve(root, 'DashboardGuruProduction.tsx') },
       { find: /^\.\/DashboardSiswa$/, replacement: path.resolve(root, 'DashboardSiswaProduction.tsx') },
+      { find: /^\.\/PengaturanView$/, replacement: path.resolve(root, 'PengaturanViewProduction.tsx') },
       { find: /^\.\.\/types$/, replacement: path.resolve(root, 'types.ts') },
       { find: /^\.\.\/services\/storageService$/, replacement: path.resolve(root, 'storageServiceProduction.ts') },
       { find: /^\.\.\/components\/(.+)$/, replacement: path.resolve(root, '$1') },
