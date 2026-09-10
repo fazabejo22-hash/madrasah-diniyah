@@ -4,19 +4,22 @@ Sistem administrasi akademik Madrasah Diniyah Takmiliyah Annajiyah 2, PP. Bahrul
 
 ## Status finalisasi
 
-Branch `finalisasi-publish` digunakan untuk penyesuaian produksi sebelum digabung ke `main`.
+Branch `finalisasi-publish` menggunakan data master santri dan struktur akademik dari berkas resmi proyek. Data yang belum tersedia pada sumber tidak diisi dengan placeholder atau nilai acak.
 
-Perubahan yang sudah diterapkan:
-- konfigurasi Vite/npm dan build production;
-- struktur import hasil ekspor AI Studio;
-- login menggunakan akun tersimpan, bukan simulasi peran;
-- database santri tanpa fitur hafalan Al-Qur'an 2 juz;
-- upload foto santri oleh admin untuk kebutuhan kartu identitas;
-- Muhafadloh memakai 8 periode M1-M8;
-- absensi diselaraskan dengan format data resmi;
-- ijazah dua halaman dengan bingkai, identitas, status kelulusan, dan daftar nilai; nilai yang belum ada ditampilkan kosong, bukan data contoh.
+Fitur yang telah difinalisasi meliputi:
 
-## Menjalankan project
+- master santri resmi dan upload foto santri oleh administrator;
+- absensi bulanan sesuai struktur workbook;
+- Muhafadloh delapan periode (M1-M8) dalam satu tahun;
+- buku nilai semester tanpa generator nilai demo;
+- raport yang mengambil nilai dari buku nilai tersimpan;
+- ijazah dua halaman dengan data kosong tetap kosong sampai diinput;
+- dashboard Admin, Guru, dan Santri tanpa statistik simulasi;
+- login tanpa kredensial demo bawaan dan setup administrator pertama;
+- pencarian global berbasis data produksi;
+- pemeriksaan build otomatis melalui GitHub Actions.
+
+## Menjalankan aplikasi
 
 ```bash
 npm ci
@@ -29,4 +32,4 @@ Build produksi:
 npm run build
 ```
 
-Output build berada di direktori `dist/`.
+> Catatan deployment: penyimpanan dan akun pada versi ini masih berbasis penyimpanan browser. Untuk publikasi internet multi-perangkat, autentikasi dan database server-side perlu dikonfigurasi pada tahap deployment agar data tidak hanya tersimpan pada satu browser.
