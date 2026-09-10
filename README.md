@@ -1,20 +1,32 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Madrasah Diniyah Takmiliyah Annajiyah 2
 
-# Run and deploy your AI Studio app
+Sistem administrasi akademik Madrasah Diniyah Takmiliyah Annajiyah 2, PP. Bahrul Ulum Tambakberas Jombang.
 
-This contains everything you need to run your app locally.
+## Status finalisasi
 
-View your app in AI Studio: https://ai.studio/apps/6634a12b-6f8c-45d2-aea7-7326259f602f
+Branch `finalisasi-publish` digunakan untuk penyesuaian produksi sebelum digabung ke `main`.
 
-## Run Locally
+Perubahan yang sudah diterapkan:
+- konfigurasi Vite/npm dan build production;
+- struktur import hasil ekspor AI Studio;
+- login menggunakan akun tersimpan, bukan simulasi peran;
+- database santri tanpa fitur hafalan Al-Qur'an 2 juz;
+- upload foto santri oleh admin untuk kebutuhan kartu identitas;
+- Muhafadloh memakai 8 periode M1-M8;
+- absensi diselaraskan dengan format data resmi;
+- ijazah dua halaman dengan bingkai, identitas, status kelulusan, dan daftar nilai; nilai yang belum ada ditampilkan kosong, bukan data contoh.
 
-**Prerequisites:**  Node.js
+## Menjalankan project
 
+```bash
+npm ci
+npm run dev
+```
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+Build produksi:
+
+```bash
+npm run build
+```
+
+Output build berada di direktori `dist/`.
