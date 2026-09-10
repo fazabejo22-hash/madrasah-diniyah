@@ -77,8 +77,8 @@ export default function App() {
     case 'peraturan_guru': return <PeraturanGuruView userRole={normalizedRole} currentUser={currentUser}/>;
     case 'siswa': return <SiswaDatabaseView userRole={normalizedRole}/>;
     case 'muhafadzoh': return <MuhafadzohView userRole={normalizedRole} currentUser={currentUser}/>;
-    case 'pengumuman': return <PengumumanView/>;
-    case 'pengaturan': return <PengaturanView currentRole={normalizedRole} onSwitchRole={()=>{}}/>;
+    case 'pengumuman': return <PengumumanView userRole={normalizedRole}/>;
+    case 'pengaturan': return <PengaturanView currentRole={normalizedRole} currentUser={currentUser} onSwitchRole={()=>{}}/>;
     case 'notifikasi': return <NotifikasiView notifications={notifications} onMarkRead={handleMarkNotificationRead} onNavigate={setCurrentPage}/>;
     default: return normalizedRole==='Admin'?<DashboardAdmin user={currentUser} onNavigate={setCurrentPage} onSwitchRole={()=>{}} absensiSession={absensiSession}/>:normalizedRole==='Siswa'?<DashboardSiswa user={currentUser} onNavigate={setCurrentPage}/>:<DashboardGuru user={currentUser} onNavigate={setCurrentPage} absensiSession={absensiSession}/>;
   }};
