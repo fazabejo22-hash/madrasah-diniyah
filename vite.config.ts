@@ -20,6 +20,8 @@ export default defineConfig(() => ({
       { find: /^\.\/BukuKerjaGuruView$/, replacement: path.resolve(root, 'BukuKerjaGuruViewProduction.tsx') },
       { find: /^\.\/BukuKerjaSiswaView$/, replacement: path.resolve(root, 'BukuKerjaSiswaViewProduction.tsx') },
       { find: /^\.\/SoalUjianView$/, replacement: path.resolve(root, 'SoalUjianViewProduction.tsx') },
+      { find: /^\.\/RaportView$/, replacement: path.resolve(root, 'RaportViewProduction.tsx') },
+      { find: /^\.\/IjazahView$/, replacement: path.resolve(root, 'IjazahViewProduction.tsx') },
       { find: /^\.\/PengumumanView$/, replacement: path.resolve(root, 'PengumumanViewProduction.tsx') },
       { find: /^\.\/HariLiburView$/, replacement: path.resolve(root, 'HariLiburViewProduction.tsx') },
       { find: /^\.\/PesantrenInfoView$/, replacement: path.resolve(root, 'PesantrenInfoViewProduction.tsx') },
