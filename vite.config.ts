@@ -11,6 +11,7 @@ export default defineConfig(() => ({
     alias: [
       { find: '@', replacement: path.resolve(root, '.') },
       { find: /^\.\/NilaiView$/, replacement: path.resolve(root, 'NilaiViewProduction.tsx') },
+      { find: /^\.\/DashboardSiswa$/, replacement: path.resolve(root, 'DashboardSiswaProduction.tsx') },
       { find: /^\.\.\/types$/, replacement: path.resolve(root, 'types.ts') },
       { find: /^\.\.\/services\/storageService$/, replacement: path.resolve(root, 'storageServiceProduction.ts') },
       { find: /^\.\.\/components\/(.+)$/, replacement: path.resolve(root, '$1') },
